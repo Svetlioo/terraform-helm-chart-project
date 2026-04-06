@@ -24,6 +24,4 @@ resources:
     memory: 512Mi
 
 ingress:
-  enabled: true
-  className: traefik
-  host: dev.java-app.local
+  enabled: false
