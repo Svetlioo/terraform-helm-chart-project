@@ -23,6 +23,9 @@ jobs:
   promote:
     name: Create PR test → prod
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
 
     steps:
       - name: Checkout prod branch
