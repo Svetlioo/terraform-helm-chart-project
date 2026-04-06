@@ -2,7 +2,7 @@
 replicaCount: 1
 
 image:
-  repository: ghcr.io/Svetlioo/java-app
+  repository: ghcr.io/svetlioo/java-app
   tag: "1.0.0-d25acc7"
 
 env:
