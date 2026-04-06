@@ -1,0 +1,88 @@
+# =============================================================================
+# PROMOTE DEV → TEST
+# =============================================================================
+# This workflow creates a PR from the dev branch into the test branch.
+# After merge, ArgoCD automatically deploys to the test namespace.
+#
+# Trigger options:
+#   1. Manual: GitHub Actions tab > "Promote dev to test" > Run workflow
+#   2. Automatic: runs after a PR is merged into the dev branch
+#      (meaning: every time app-repo CI updates dev, auto-promote to test)
+#      NOTE: Remove the push trigger below if you want manual-only promotion.
+# =============================================================================
+
+name: Promote dev → test
+
+on:
+  # Manual trigger
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Reason for promotion (shown in PR description)'
+        required: false
+        default: 'Manual promotion after dev verification'
+
+  # Automatic: after dev branch is updated (app repo CI merged a deploy PR)
+  # Remove this if you want test promotion to be manual only
+  push:
+    branches: [dev]
+    paths:
+      - 'helm/java-app/values-dev.yaml'
+
+jobs:
+  promote:
+    name: Create PR dev → test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout test branch
+        uses: actions/checkout@v4
+        with:
+          ref: test
+          fetch-depth: 0
+
+      - name: Get current image version in dev
+        id: dev-version
+        run: |
+          git fetch origin dev
+          IMAGE_TAG=$(git show origin/dev:helm/java-app/values-dev.yaml | grep '  tag:' | sed 's/.*tag: "\(.*\)"/\1/')
+          echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
+          echo "Current dev image tag: ${IMAGE_TAG}"
+
+      - name: Create promotion PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          IMAGE_TAG="${{ steps.dev-version.outputs.image_tag }}"
+          REASON="${{ github.event.inputs.reason || 'Automated promotion from dev after successful deployment' }}"
+
+          PR_URL=$(gh pr create \
+            --title "promote: dev → test (java-app ${IMAGE_TAG})" \
+            --body "## Promotion: dev → test
+
+          | Field | Value |
+          |-------|-------|
+          | Image version | \`${IMAGE_TAG}\` |
+          | From | \`dev\` branch |
+          | To | \`test\` branch |
+          | Reason | ${REASON} |
+
+          ### What happens after merge
+          ArgoCD will automatically detect the change in the \`test\` branch
+          and deploy the new version to the **test namespace**.
+
+          ### How to verify in dev first
+          \`\`\`bash
+          kubectl port-forward svc/java-app-dev -n dev 9091:8080
+          curl http://localhost:9091/api/info
+          \`\`\`
+
+          ### After test is verified, promote to prod
+          Run the **'Promote test → prod'** workflow." \
+            --base test \
+            --head dev)
+
+          echo "PR created: ${PR_URL}"
+          echo "## Promotion PR" >> $GITHUB_STEP_SUMMARY
+          echo "**PR:** ${PR_URL}" >> $GITHUB_STEP_SUMMARY
+          echo "**Merge this PR to deploy \`${IMAGE_TAG}\` to test.**" >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,16 @@
+fullnameOverride: postgresql-dev
+
+database:
+  name: appdb_dev
+  username: appuser_dev
+
+storage:
+  size: 512Mi
+
+resources:
+  limits:
+    cpu: 200m
+    memory: 192Mi
+  requests:
+    cpu: 50m
+    memory: 64Mi

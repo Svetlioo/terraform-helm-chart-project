@@ -1,0 +1,6 @@
+# Configuration for running GitHub Actions locally with 'act'
+# Install: brew install act
+# Usage: act -j build --container-architecture linux/amd64
+
+--container-architecture linux/amd64
+-P ubuntu-latest=catthehacker/ubuntu:act-latest

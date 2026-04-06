@@ -1,0 +1,34 @@
+# Production environment values
+replicaCount: 2
+
+image:
+  repository: ghcr.io/Svetlioo/java-app
+
+env:
+  APP_ENVIRONMENT: "prod"
+  APP_VERSION: "1.0.0"
+
+database:
+  host: postgresql-prod
+  name: appdb_prod
+  username: appuser_prod
+  existingSecret: java-app-db-secret
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 200m
+    memory: 256Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 4
+  targetCPUUtilizationPercentage: 75
+
+ingress:
+  enabled: true
+  className: traefik
+  host: java-app.local

@@ -1,0 +1,173 @@
+# =============================================================================
+# APP REPOSITORY CI PIPELINE
+# =============================================================================
+# Place at .github/workflows/ci.yml in your Java app repo.
+#
+# Flow:
+#   push to main
+#     └─> [1] test        Run Maven tests with real PostgreSQL (stops here if fail)
+#           └─> [2] build  Build JAR + Docker image, push to ghcr.io (free, on GitHub)
+#                 └─> [3] promote  Update image tag in IaC repo dev branch, auto-merge
+#                                  ArgoCD detects change → deploys to dev namespace
+#
+# Required secrets (app repo → Settings → Secrets → Actions):
+#   IAC_REPO_TOKEN  PAT with Contents + Pull requests (read/write) on the IaC repo
+#                   GitHub → Settings → Developer settings → Fine-grained tokens
+#
+# Required variables (app repo → Settings → Variables → Actions):
+#   IAC_REPO        e.g. your-username/terraform-helm-chart-project
+#
+# GITHUB_TOKEN is provided automatically — used for ghcr.io login.
+# No separate registry account needed. Images go to ghcr.io/<owner>/java-app:<tag>
+# =============================================================================
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  IMAGE_NAME: java-app
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # JOB 1: TEST
+  # Runs all Maven tests against a real PostgreSQL container.
+  # Pipeline stops here if any test fails — nothing gets built or deployed.
+  # ---------------------------------------------------------------------------
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: appdb_test
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpassword
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Run tests
+        env:
+          DB_URL: jdbc:postgresql://localhost:5432/appdb_test
+          DB_USERNAME: testuser
+          DB_PASSWORD: testpassword
+        run: mvn test
+
+  # ---------------------------------------------------------------------------
+  # JOB 2: BUILD & PUSH IMAGE
+  # Builds the JAR, wraps it in a Docker image, pushes to ghcr.io.
+  # ghcr.io is GitHub's free container registry — no extra account needed.
+  # Only runs on push to main (not on PRs).
+  # ---------------------------------------------------------------------------
+  build:
+    name: Build & Push Image
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Set version
+        id: version
+        run: |
+          POM_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout | sed 's/-SNAPSHOT//')
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          echo "version=${POM_VERSION}-${SHORT_SHA}" >> $GITHUB_OUTPUT
+
+      - name: Build JAR
+        run: mvn package -DskipTests
+
+      - name: Copy JAR for Docker
+        run: cp target/*.jar docker/app.jar
+
+      - name: Log in to ghcr.io
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Build and push Docker image
+        run: |
+          IMAGE="ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}"
+          VERSION="${{ steps.version.outputs.version }}"
+          docker build -t "${IMAGE}:${VERSION}" -t "${IMAGE}:latest" -f docker/Dockerfile docker/
+          docker push "${IMAGE}:${VERSION}"
+          docker push "${IMAGE}:latest"
+          echo "Pushed: ${IMAGE}:${VERSION}" >> $GITHUB_STEP_SUMMARY
+
+  # ---------------------------------------------------------------------------
+  # JOB 3: PROMOTE TO DEV
+  # Updates values-dev.yaml in the IaC repo with the new image tag.
+  # Opens a PR to the dev branch and auto-merges it.
+  # ArgoCD sees the change and deploys to the dev namespace automatically.
+  # ---------------------------------------------------------------------------
+  promote:
+    name: Update IaC repo dev branch
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Checkout IaC repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.IAC_REPO }}
+          token: ${{ secrets.IAC_REPO_TOKEN }}
+          ref: dev
+          path: iac-repo
+
+      - name: Update image tag
+        working-directory: iac-repo
+        run: |
+          VERSION="${{ needs.build.outputs.version }}"
+          sed -i "s|  tag: \".*\"|  tag: \"${VERSION}\"|" helm/java-app/values-dev.yaml
+          grep 'tag:' helm/java-app/values-dev.yaml
+
+      - name: Open PR and auto-merge
+        working-directory: iac-repo
+        env:
+          GH_TOKEN: ${{ secrets.IAC_REPO_TOKEN }}
+        run: |
+          VERSION="${{ needs.build.outputs.version }}"
+          BRANCH="auto-deploy/dev-$(echo $VERSION | tr '.' '-')"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "${BRANCH}"
+          git add helm/java-app/values-dev.yaml
+          git commit -m "deploy(dev): java-app ${VERSION}"
+          git push origin "${BRANCH}"
+
+          PR=$(gh pr create \
+            --repo "${{ vars.IAC_REPO }}" \
+            --title "deploy(dev): java-app ${VERSION}" \
+            --body "Automated deploy after tests passed. ArgoCD will sync dev namespace on merge." \
+            --base dev --head "${BRANCH}")
+
+          gh pr merge "${PR}" --merge --auto --delete-branch
+          echo "Merged: ${PR}" >> $GITHUB_STEP_SUMMARY

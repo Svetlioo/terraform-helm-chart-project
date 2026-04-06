@@ -1,0 +1,58 @@
+# Test environment - tracks 'test' branch of the IaC repo
+#
+# Flow: You merge 'dev' branch into 'test' branch (via PR)
+#       -> ArgoCD detects the change -> auto-deploys to test namespace
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: postgresql-test
+  namespace: argocd
+  labels:
+    environment: test
+    component: database
+spec:
+  project: java-app
+  source:
+    repoURL: https://github.com/Svetlioo/terraform-helm-chart-project.git
+    targetRevision: test
+    path: helm/postgresql
+    helm:
+      valueFiles:
+        - values-test.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: test
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: java-app-test
+  namespace: argocd
+  labels:
+    environment: test
+    component: application
+spec:
+  project: java-app
+  source:
+    repoURL: https://github.com/Svetlioo/terraform-helm-chart-project.git
+    targetRevision: test
+    path: helm/java-app
+    helm:
+      valueFiles:
+        - values-test.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: test
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

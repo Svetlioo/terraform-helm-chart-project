@@ -1,0 +1,22 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: java-app
+  namespace: argocd
+spec:
+  description: Java application project across all environments
+  sourceRepos:
+    - '*'
+  destinations:
+    - namespace: dev
+      server: https://kubernetes.default.svc
+    - namespace: test
+      server: https://kubernetes.default.svc
+    - namespace: prod
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: ''
+      kind: Namespace
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'

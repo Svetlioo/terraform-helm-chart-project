@@ -1,0 +1,19 @@
+# =============================================================================
+# Terraform Variables
+# =============================================================================
+# Copy this file to terraform.tfvars and fill in your values:
+#   cp terraform/terraform.tfvars.example terraform/terraform.tfvars
+#
+# terraform.tfvars is gitignored - your secrets stay local.
+# =============================================================================
+
+github_repo_url = "https://github.com/YOUR_USERNAME/terraform-helm-chart-project.git"
+
+github_username = "YOUR_USERNAME"
+github_token    = "ghp_your_token_here"
+
+db_passwords = {
+  dev  = "change-me-dev"
+  test = "change-me-test"
+  prod = "change-me-prod"
+}

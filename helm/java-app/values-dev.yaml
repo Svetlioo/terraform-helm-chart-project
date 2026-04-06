@@ -1,0 +1,28 @@
+# Dev environment values
+replicaCount: 1
+
+image:
+  repository: ghcr.io/Svetlioo/java-app
+
+env:
+  APP_ENVIRONMENT: "dev"
+  APP_VERSION: "1.0.0-dev"
+
+database:
+  host: postgresql-dev
+  name: appdb_dev
+  username: appuser_dev
+  existingSecret: java-app-db-secret
+
+resources:
+  limits:
+    cpu: 250m
+    memory: 384Mi
+  requests:
+    cpu: 50m
+    memory: 128Mi
+
+ingress:
+  enabled: true
+  className: traefik
+  host: dev.java-app.local

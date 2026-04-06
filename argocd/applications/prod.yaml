@@ -1,0 +1,53 @@
+# Production environment - tracks 'prod' branch of the IaC repo
+#
+# Flow: You merge 'test' branch into 'prod' branch (via PR)
+#       -> ArgoCD detects change but DOES NOT auto-deploy
+#       -> You manually click "Sync" in ArgoCD UI
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: postgresql-prod
+  namespace: argocd
+  labels:
+    environment: prod
+    component: database
+spec:
+  project: java-app
+  source:
+    repoURL: https://github.com/Svetlioo/terraform-helm-chart-project.git
+    targetRevision: prod
+    path: helm/postgresql
+    helm:
+      valueFiles:
+        - values-prod.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: prod
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=false
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: java-app-prod
+  namespace: argocd
+  labels:
+    environment: prod
+    component: application
+spec:
+  project: java-app
+  source:
+    repoURL: https://github.com/Svetlioo/terraform-helm-chart-project.git
+    targetRevision: prod
+    path: helm/java-app
+    helm:
+      valueFiles:
+        - values-prod.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: prod
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=false

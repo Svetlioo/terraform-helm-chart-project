@@ -1,0 +1,58 @@
+# Dev environment - tracks 'dev' branch of the IaC repo
+#
+# Flow: App repo CI pushes new image tag -> creates PR to IaC repo dev branch
+#       -> auto-merges -> ArgoCD detects change -> auto-deploys to dev namespace
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: postgresql-dev
+  namespace: argocd
+  labels:
+    environment: dev
+    component: database
+spec:
+  project: java-app
+  source:
+    repoURL: https://github.com/Svetlioo/terraform-helm-chart-project.git
+    targetRevision: dev
+    path: helm/postgresql
+    helm:
+      valueFiles:
+        - values-dev.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: dev
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: java-app-dev
+  namespace: argocd
+  labels:
+    environment: dev
+    component: application
+spec:
+  project: java-app
+  source:
+    repoURL: https://github.com/Svetlioo/terraform-helm-chart-project.git
+    targetRevision: dev
+    path: helm/java-app
+    helm:
+      valueFiles:
+        - values-dev.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: dev
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

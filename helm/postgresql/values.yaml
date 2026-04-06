@@ -1,0 +1,30 @@
+# Default PostgreSQL values
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  repository: postgres
+  tag: "16-alpine"
+  pullPolicy: IfNotPresent
+
+database:
+  name: appdb
+  username: appuser
+  existingSecret: java-app-db-secret
+  secretKey: password
+
+service:
+  type: ClusterIP
+  port: 5432
+
+storage:
+  size: 1Gi
+  storageClass: local-path
+
+resources:
+  limits:
+    cpu: 250m
+    memory: 256Mi
+  requests:
+    cpu: 50m
+    memory: 128Mi

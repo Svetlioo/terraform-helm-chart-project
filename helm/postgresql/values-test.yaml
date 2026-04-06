@@ -1,0 +1,16 @@
+fullnameOverride: postgresql-test
+
+database:
+  name: appdb_test
+  username: appuser_test
+
+storage:
+  size: 512Mi
+
+resources:
+  limits:
+    cpu: 250m
+    memory: 256Mi
+  requests:
+    cpu: 50m
+    memory: 128Mi

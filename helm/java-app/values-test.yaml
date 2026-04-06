@@ -1,0 +1,29 @@
+# Test environment values
+replicaCount: 1
+
+image:
+  repository: ghcr.io/Svetlioo/java-app
+  tag: "latest"
+
+env:
+  APP_ENVIRONMENT: "test"
+  APP_VERSION: "1.0.0"
+
+database:
+  host: postgresql-test
+  name: appdb_test
+  username: appuser_test
+  existingSecret: java-app-db-secret
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+
+ingress:
+  enabled: true
+  className: traefik
+  host: test.java-app.local

@@ -1,0 +1,62 @@
+# Default values for java-app
+replicaCount: 1
+
+image:
+  # ghcr.io/YOUR_USERNAME/java-app — set via values-<env>.yaml
+  repository: ghcr.io/YOUR_USERNAME/java-app
+  pullPolicy: Always
+  tag: "latest"
+  pullSecrets:
+    - name: ghcr-pull-secret
+
+nameOverride: ""
+fullnameOverride: ""
+
+service:
+  type: ClusterIP
+  port: 8080
+
+ingress:
+  enabled: false
+  className: traefik
+  host: ""
+
+env:
+  APP_ENVIRONMENT: "default"
+  APP_VERSION: "1.0.0"
+
+database:
+  host: postgresql
+  port: 5432
+  name: appdb
+  username: appuser
+  existingSecret: java-app-db-secret
+  secretKey: password
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 80
+
+livenessProbe:
+  httpGet:
+    path: /actuator/health
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 10
+
+readinessProbe:
+  httpGet:
+    path: /actuator/health
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 5

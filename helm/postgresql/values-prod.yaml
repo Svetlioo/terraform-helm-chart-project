@@ -1,0 +1,16 @@
+fullnameOverride: postgresql-prod
+
+database:
+  name: appdb_prod
+  username: appuser_prod
+
+storage:
+  size: 2Gi
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 256Mi

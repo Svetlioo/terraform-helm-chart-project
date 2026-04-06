@@ -1,0 +1,33 @@
+# Terraform
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.backup
+terraform/.terraform.lock.hcl
+terraform/terraform.tfvars
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*tempCodeRunnerFile*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+docker/.env
+
+# Secrets - NEVER commit real secrets
+secrets/.env
+k8s/secrets/*/secret-values.yaml
+terraform/terraform.tfvars
+*.sealed-secret-key.yaml
+
+# Java build artifacts
+*.jar
+*.class
+target/
+
+# act
+.actrc.local

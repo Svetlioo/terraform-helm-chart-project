@@ -1,0 +1,90 @@
+# =============================================================================
+# PROMOTE TEST → PROD
+# =============================================================================
+# This workflow creates a PR from the test branch into the prod branch.
+# After merge, ArgoCD detects the change but DOES NOT auto-deploy.
+# You must go to the ArgoCD UI and manually click "Sync" on the prod apps.
+# This manual step is the production safety gate.
+#
+# Trigger: Manual only (GitHub Actions tab > "Promote test to prod" > Run workflow)
+# =============================================================================
+
+name: Promote test → prod
+
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Reason / ticket number for this production release'
+        required: true
+        placeholder: 'e.g. JIRA-123 - Feature X approved by QA'
+
+jobs:
+  promote:
+    name: Create PR test → prod
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout prod branch
+        uses: actions/checkout@v4
+        with:
+          ref: prod
+          fetch-depth: 0
+
+      - name: Get current image version in test
+        id: test-version
+        run: |
+          git fetch origin test
+          IMAGE_TAG=$(git show origin/test:helm/java-app/values-test.yaml | grep '  tag:' | sed 's/.*tag: "\(.*\)"/\1/')
+          echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
+          echo "Current test image tag: ${IMAGE_TAG}"
+
+      - name: Create promotion PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          IMAGE_TAG="${{ steps.test-version.outputs.image_tag }}"
+          REASON="${{ github.event.inputs.reason }}"
+
+          PR_URL=$(gh pr create \
+            --title "release: test → prod (java-app ${IMAGE_TAG})" \
+            --body "## Production Release: test → prod
+
+          | Field | Value |
+          |-------|-------|
+          | Image version | \`${IMAGE_TAG}\` |
+          | From | \`test\` branch |
+          | To | \`prod\` branch |
+          | Reason / Ticket | ${REASON} |
+          | Initiated by | @${{ github.actor }} |
+
+          ### ⚠️ This is a PRODUCTION deployment
+
+          **After merging this PR:**
+          - ArgoCD will detect the change in the \`prod\` branch
+          - ArgoCD will show prod apps as **OutOfSync**
+          - You must go to the ArgoCD UI and manually click **Sync**
+          - This gives you a final review opportunity before deploying
+
+          ### Pre-merge checklist
+          - [ ] Test environment has been verified and is healthy
+          - [ ] All relevant tests have passed
+          - [ ] Release has been approved by the relevant stakeholder
+          - [ ] Production deployment window is appropriate
+
+          ### How to deploy after merge
+          \`\`\`
+          # 1. Merge this PR
+          # 2. Open ArgoCD UI: kubectl port-forward svc/argocd-server -n argocd 8080:443
+          # 3. Go to java-app-prod application
+          # 4. Click Sync
+          # 5. Verify: kubectl get pods -n prod
+          \`\`\`" \
+            --base prod \
+            --head test)
+
+          echo "PR created: ${PR_URL}"
+          echo "## Production Release PR" >> $GITHUB_STEP_SUMMARY
+          echo "**PR:** ${PR_URL}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**After merging: go to ArgoCD UI and manually sync the prod apps.**" >> $GITHUB_STEP_SUMMARY
