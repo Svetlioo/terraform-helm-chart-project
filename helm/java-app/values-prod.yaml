@@ -29,6 +29,4 @@ autoscaling:
   targetCPUUtilizationPercentage: 75
 
 ingress:
-  enabled: true
-  className: traefik
-  host: java-app.local
+  enabled: false
