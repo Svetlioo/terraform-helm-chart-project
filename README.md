@@ -321,12 +321,22 @@ git add . && git commit -m "feat: my change" && git push
 **What happens automatically:**
 1. GitHub Actions runs tests against PostgreSQL — stops if any fail
 2. Builds Docker image, pushes to `ghcr.io/YOUR_USERNAME/java-app:1.0.0-abc1234`
-3. Clones IaC repo, updates `values-dev.yaml` image tag, opens PR to `dev` branch, merges it
+3. Clones IaC repo, updates `values-dev.yaml` image tag, opens PR to `dev` branch, auto-merges it
 4. ArgoCD detects change in `dev` branch → deploys new image to dev namespace
-5. "Promote dev→test" workflow fires automatically → creates PR to update `values-test.yaml`
+5. The push to `dev` branch (step 3) automatically triggers the `promote-to-test` workflow — it creates a PR to update `values-test.yaml` on the `test` branch, but **does not merge it** — you review and merge manually
 
 Watch the CI: App repo → Actions tab.
 Watch the deployment: ArgoCD UI or `kubectl get pods -n dev -w`.
+
+### Automation levels at a glance
+
+| Stage | What triggers it | Who merges | ArgoCD deploys |
+|-------|-----------------|------------|----------------|
+| → dev | App CI on push to `main` (automatic) | CI auto-merges | Automatically |
+| → test | Push to `dev` branch (automatic) | You merge the PR | Automatically after merge |
+| → prod | You run the workflow manually | You merge the PR | You click Sync in ArgoCD UI |
+
+The key distinction: **promote-to-test fires automatically** (triggered by the push to dev), but it only opens a PR — it never auto-merges into test. That PR is your gate to decide "yes, this is ready for testing".
 
 ---
 
