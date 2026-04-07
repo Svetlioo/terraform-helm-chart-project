@@ -3,7 +3,7 @@ replicaCount: 2
 
 image:
   repository: ghcr.io/svetlioo/java-app
-  tag: "1.0.0-3a5e586"
+  tag: "1.0.0-2fa5358"
 
 env:
   APP_ENVIRONMENT: "prod"
